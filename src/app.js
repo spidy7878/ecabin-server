@@ -16,16 +16,17 @@ const errorHandler = require('./middleware/errorHandler');
 const app = express();
 
 // ── iisnode URL restoration ───────────────────────────────────────────────────
-// Some versions of iisnode on shared hosting (e.g. SmartASP.NET) do not
-// automatically restore req.url from the X-Original-URL header after an IIS
-// URL Rewrite. We restore it here so Express routing works correctly.
+// IIS URL Rewrite sets HTTP_X_ORIGINAL_URL automatically on every rewrite.
+// iisnode passes it as the x-original-url request header.
+// Without this, req.url = '/server.js' and no Express routes match.
 app.use((req, _res, next) => {
-  const originalUrl = req.headers['x-original-url'];
+  const originalUrl = req.headers['x-original-url']     // set by IIS URL Rewrite
+                   || req.headers['x-iisnode-original-url']; // fallback
   if (originalUrl) {
     try {
       const parsed = new URL(originalUrl, 'http://localhost');
       req.url = parsed.pathname + (parsed.search || '');
-    } catch { /* ignore */ }
+    } catch { /* ignore malformed header */ }
   }
   next();
 });
