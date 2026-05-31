@@ -1,0 +1,32 @@
+const { getPool, sql } = require('../config/db');
+
+const SAFE_COLS = 'LavatoriesId, AircraftId, LavatoriesCode, LavatoriesName, Location, LavatoriesType, Status, LastInspectionDate, NextInspectionDate, Notes';
+
+const lavatoriesController = {
+  async getAll(req, res) {
+    const pool = await getPool();
+    const req2  = pool.request();
+    let query   = `SELECT ${SAFE_COLS} FROM dbo.Lavatories`;
+    if (req.query.aircraftId) {
+      req2.input('aircraftId', sql.Int, parseInt(req.query.aircraftId, 10));
+      query += ' WHERE AircraftId = @aircraftId';
+    }
+    query += ' ORDER BY LavatoriesCode';
+    const result = await req2.query(query);
+    res.json(result.recordset);
+  },
+
+  async getById(req, res) {
+    const pool   = await getPool();
+    const result = await pool
+      .request()
+      .input('id', sql.Int, parseInt(req.params.id, 10))
+      .query(`SELECT ${SAFE_COLS} FROM dbo.Lavatories WHERE LavatoriesId = @id`);
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: { message: 'Lavatory not found' } });
+    }
+    res.json(result.recordset[0]);
+  },
+};
+
+module.exports = lavatoriesController;
