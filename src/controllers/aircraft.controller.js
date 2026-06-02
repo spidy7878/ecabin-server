@@ -5,9 +5,34 @@ const SAFE_COLS = 'AircraftId, MSN, Registration, AircraftType, DOM, IsActive';
 const aircraftController = {
   async getAll(req, res) {
     const pool = await getPool();
+
+    // Admin / Manager see the whole fleet.  An inspector (User) only sees the
+    // aircraft belonging to their operator — i.e. Aircraft.OperatorId matches
+    // their own UsersDetail.Organisation.  This is the only inspector→aircraft
+    // assignment link that exists in the data (there is no per-inspector
+    // assignment table populated yet), so an inspector whose Organisation is
+    // NULL or unmatched correctly gets an empty fleet.
+    const isPrivileged = req.user.role === 'Admin' || req.user.role === 'Manager';
+
+    if (isPrivileged) {
+      const result = await pool
+        .request()
+        .query(`SELECT ${SAFE_COLS} FROM dbo.Aircraft ORDER BY MSN`);
+      return res.json(result.recordset);
+    }
+
     const result = await pool
       .request()
-      .query(`SELECT ${SAFE_COLS} FROM dbo.Aircraft ORDER BY MSN`);
+      .input('userId', sql.Int, req.user.userId)
+      .query(`
+        SELECT ${SAFE_COLS.split(', ').map(col => `a.${col}`).join(', ')}
+        FROM dbo.Aircraft a
+        INNER JOIN dbo.UsersDetail u
+          ON u.UserId = @userId
+         AND RTRIM(LTRIM(CAST(a.OperatorId  AS NVARCHAR(50)))) =
+             RTRIM(LTRIM(CAST(u.Organisation AS NVARCHAR(50))))
+        ORDER BY a.MSN
+      `);
     res.json(result.recordset);
   },
 

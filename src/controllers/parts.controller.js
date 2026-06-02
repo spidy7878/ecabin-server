@@ -18,7 +18,7 @@ async function getBySubCatAndAircraft(req, res) {
       .input('subCatId',   sql.NVarChar, String(subCatId))
       .input('aircraftId', sql.Int,      parseInt(aircraftId, 10))
       .query(`
-        SELECT DISTINCT p.PartID, p.PartName
+        SELECT MIN(p.PartID) AS PartID, p.PartName
         FROM dbo.Parts p
         INNER JOIN dbo.PartsSubCatLink l
           ON CAST(p.PartID AS NVARCHAR(20)) = RTRIM(CAST(l.PartID AS NVARCHAR(20)))
@@ -29,6 +29,7 @@ async function getBySubCatAndAircraft(req, res) {
          AND m.AircraftId = @aircraftId
          AND RTRIM(m.PartsMSNLinkStatus) = '1'
          AND RTRIM(m.PartsMSNLinkDelMrk) = '0'
+        GROUP BY p.PartName
         ORDER BY p.PartName
       `);
     res.json(result.recordset);
