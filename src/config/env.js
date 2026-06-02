@@ -2,7 +2,7 @@
  * Validates required environment variables on startup.
  * Throws immediately if any required var is missing so the app fails fast.
  */
-const REQUIRED_VARS = ['DB_SERVER', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+const REQUIRED_VARS = ['DB_SERVER', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'JWT_SECRET'];
 
 for (const varName of REQUIRED_VARS) {
   if (!process.env[varName]) {
