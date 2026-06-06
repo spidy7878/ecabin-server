@@ -27,5 +27,6 @@ router.use('/parts',        requireAuth, require('./parts.routes'));
 router.use('/issues',       requireAuth, require('./issues.routes'));
 router.use('/dashboard',    requireAuth, require('./dashboard.routes'));
 router.use('/inspections',  requireAuth, require('./inspections.routes'));
+router.use('/assignments',  require('./assignments.routes'));
 
 module.exports = router;

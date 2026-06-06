@@ -23,12 +23,12 @@ async function getBySubCatAndAircraft(req, res) {
         INNER JOIN dbo.PartsSubCatLink l
           ON CAST(p.PartID AS NVARCHAR(20)) = RTRIM(CAST(l.PartID AS NVARCHAR(20)))
          AND RTRIM(CAST(l.SubCatID AS NVARCHAR(20))) = @subCatId
-         AND l.PartsSubCatLinkDelMrk = 'N'
+         AND (l.PartsSubCatLinkDelMrk = 'N' OR l.PartsSubCatLinkDelMrk IS NULL)
         INNER JOIN dbo.PartsMSNLink m
           ON m.PartID = p.PartID
          AND m.AircraftId = @aircraftId
-         AND RTRIM(m.PartsMSNLinkStatus) = '1'
-         AND RTRIM(m.PartsMSNLinkDelMrk) = '0'
+         AND (RTRIM(m.PartsMSNLinkStatus) = '1' OR m.PartsMSNLinkStatus IS NULL)
+         AND (RTRIM(m.PartsMSNLinkDelMrk) = '0' OR m.PartsMSNLinkDelMrk IS NULL)
         GROUP BY p.PartName
         ORDER BY p.PartName
       `);

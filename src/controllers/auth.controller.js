@@ -40,9 +40,9 @@ const authController = {
     // Use same error message for missing user and wrong password
     // to prevent user enumeration
     const user = result.recordset[0];
-    const storedPassword = user ? user.Password : 'INVALID_PLACEHOLDER';
+    const storedPassword = (user && user.Password) ? user.Password : 'INVALID_PLACEHOLDER';
 
-    if (!user || !safeCompare(storedPassword, password)) {
+    if (!user || !user.Password || !safeCompare(storedPassword, password)) {
       return res.status(401).json({ error: { message: 'Invalid username or password' } });
     }
 

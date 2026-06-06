@@ -21,16 +21,17 @@ const aircraftController = {
       return res.json(result.recordset);
     }
 
+    // User (inspector) role: return only aircraft explicitly assigned via InspectorAircraftAssignment
     const result = await pool
       .request()
       .input('userId', sql.Int, req.user.userId)
       .query(`
         SELECT ${SAFE_COLS.split(', ').map(col => `a.${col}`).join(', ')}
         FROM dbo.Aircraft a
-        INNER JOIN dbo.UsersDetail u
-          ON u.UserId = @userId
-         AND RTRIM(LTRIM(CAST(a.OperatorId  AS NVARCHAR(50)))) =
-             RTRIM(LTRIM(CAST(u.Organisation AS NVARCHAR(50))))
+        INNER JOIN dbo.InspectorAircraftAssignment ia
+          ON ia.AircraftId = a.AircraftId
+         AND ia.UserId     = @userId
+         AND ia.Delmark    = 'N'
         ORDER BY a.MSN
       `);
     res.json(result.recordset);

@@ -16,8 +16,8 @@ async function getByCategory(req, res) {
         SELECT SubCatID, SubCatName, CatID
         FROM dbo.SubCategory
         WHERE CatID = @catId
-          AND SubCatDelMrk = 'N'
-        ORDER BY CAST(SubCatID AS INT)
+          AND (SubCatDelMrk = 'N' OR SubCatDelMrk IS NULL)
+        ORDER BY TRY_CAST(SubCatID AS INT), SubCatID
       `);
     res.json(result.recordset);
   } catch (err) {
