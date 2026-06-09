@@ -6,32 +6,26 @@ const aircraftController = {
   async getAll(req, res) {
     const pool = await getPool();
 
-    // Admin / Manager see the whole fleet.  An inspector (User) only sees the
-    // aircraft belonging to their operator — i.e. Aircraft.OperatorId matches
-    // their own UsersDetail.Organisation.  This is the only inspector→aircraft
-    // assignment link that exists in the data (there is no per-inspector
-    // assignment table populated yet), so an inspector whose Organisation is
-    // NULL or unmatched correctly gets an empty fleet.
-    const isPrivileged = req.user.role === 'Admin' || req.user.role === 'Manager';
-
-    if (isPrivileged) {
-      const result = await pool
-        .request()
-        .query(`SELECT ${SAFE_COLS} FROM dbo.Aircraft ORDER BY MSN`);
-      return res.json(result.recordset);
-    }
-
-    // User (inspector) role: return only aircraft explicitly assigned via InspectorAircraftAssignment
+    // Only inspectors (role 'User') can sign into this app, and each inspector
+    // sees only the aircraft assigned to them in dbo.InspectionDet.
+    //
+    // NOTE: InspectionDet.AircraftId actually stores the aircraft's MSN (not the
+    // Aircraft primary key), so it is matched against Aircraft.MSN.  Soft-deleted
+    // assignments (InspectionDelmark = 'Y') are excluded.  EXISTS de-duplicates
+    // aircraft that have more than one inspection row for this inspector.
     const result = await pool
       .request()
       .input('userId', sql.Int, req.user.userId)
       .query(`
         SELECT ${SAFE_COLS.split(', ').map(col => `a.${col}`).join(', ')}
         FROM dbo.Aircraft a
-        INNER JOIN dbo.InspectorAircraftAssignment ia
-          ON ia.AircraftId = a.AircraftId
-         AND ia.UserId     = @userId
-         AND ia.Delmark    = 'N'
+        WHERE EXISTS (
+          SELECT 1
+          FROM dbo.InspectionDet d
+          WHERE CAST(d.AircraftId AS nvarchar(10)) = a.MSN
+            AND d.UserID = @userId
+            AND RTRIM(d.InspectionDelmark) = 'N'
+        )
         ORDER BY a.MSN
       `);
     res.json(result.recordset);

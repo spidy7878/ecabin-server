@@ -46,6 +46,14 @@ const authController = {
       return res.status(401).json({ error: { message: 'Invalid username or password' } });
     }
 
+    // This mobile app is the inspector portal only — Admin/Manager (and any
+    // other non-inspector roles) must use the web portal, not this app.
+    if (user.Role !== 'User') {
+      return res.status(403).json({
+        error: { message: 'This app is for inspectors only. Please use the web portal.' },
+      });
+    }
+
     const payload = {
       userId:     user.UserId,
       username:   user.Username,

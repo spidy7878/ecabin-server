@@ -4,44 +4,66 @@ const dashboardController = {
   async getDashboard(req, res) {
     const pool = await getPool();
 
-    // req.user is set by requireAuth middleware.
-    // Admin / Manager → see all aircraft audits.
-    // User (inspector)  → see only audits where LastAuditPerson matches their full name.
-    const isPrivileged = req.user.role === 'Admin' || req.user.role === 'Manager';
-    const inspectorName = req.user.fullName; // "Bikram Jyoti Sinha"
+    // req.user is set by requireAuth middleware.  Only inspectors (role 'User')
+    // can sign in, and each one sees only the audit schedule for the aircraft
+    // assigned to them in dbo.InspectionDet (InspectionDet.AircraftId stores the
+    // MSN, matched against Aircraft.MSN; soft-deleted rows are excluded).
+    const request = pool.request().input('userId', sql.Int, req.user.userId);
+    const whereClause = `
+      WHERE (aa.Delmark != 'Y' OR aa.Delmark IS NULL)
+        AND EXISTS (
+          SELECT 1
+          FROM dbo.InspectionDet d
+          WHERE CAST(d.AircraftId AS nvarchar(10)) = a.MSN
+            AND d.UserID = @userId
+            AND RTRIM(d.InspectionDelmark) = 'N'
+        )`;
 
-    const request = pool.request();
-    let whereClause = `WHERE (aa.Delmark != 'Y' OR aa.Delmark IS NULL)`;
-
-    if (!isPrivileged) {
-      request.input('inspector', sql.NVarChar(200), inspectorName);
-      whereClause += ` AND LOWER(aa.LastAuditPerson) = LOWER(@inspector)`;
-    }
-
+    // An aircraft can have several rows in AircraftAudits (full audit history).
+    // The inspector schedule shows ONE card per assigned aircraft — its most
+    // recent audit record (highest AuditId) — so the dashboard isn't cluttered
+    // with historical rows and the stats reflect distinct aircraft.
     const result = await request.query(`
+      WITH scoped AS (
+        SELECT
+          aa.AuditId,
+          aa.AircraftId,
+          a.MSN,
+          a.Registration,
+          a.AircraftType,
+          aa.LastAuditDate,
+          aa.LastAuditBase,
+          aa.LastAuditPerson,
+          aa.IssuesReported,
+          aa.ExistingIssues,
+          aa.NextAuditDate,
+          ROW_NUMBER() OVER (PARTITION BY aa.AircraftId ORDER BY aa.AuditId DESC) AS rn
+        FROM AircraftAudits aa
+        JOIN Aircraft a ON aa.AircraftId = a.AircraftId
+        ${whereClause}
+      )
       SELECT
-        aa.AuditId,
-        aa.AircraftId,
-        a.MSN,
-        a.Registration,
-        a.AircraftType,
-        CONVERT(varchar(10), aa.LastAuditDate, 120)  AS LastAuditDate,
-        RTRIM(aa.LastAuditBase)                       AS LastAuditBase,
-        aa.LastAuditPerson,
-        aa.IssuesReported,
-        aa.ExistingIssues,
-        CONVERT(varchar(10), aa.NextAuditDate, 120)  AS NextAuditDate,
+        AuditId,
+        AircraftId,
+        MSN,
+        Registration,
+        AircraftType,
+        CONVERT(varchar(10), LastAuditDate, 120)  AS LastAuditDate,
+        RTRIM(LastAuditBase)                      AS LastAuditBase,
+        LastAuditPerson,
+        IssuesReported,
+        ExistingIssues,
+        CONVERT(varchar(10), NextAuditDate, 120)  AS NextAuditDate,
         CASE
-          WHEN aa.NextAuditDate < CAST(GETDATE() AS DATE)
+          WHEN NextAuditDate < CAST(GETDATE() AS DATE)
                THEN 'Overdue'
-          WHEN aa.NextAuditDate <= CAST(DATEADD(day, 30, GETDATE()) AS DATE)
+          WHEN NextAuditDate <= CAST(DATEADD(day, 30, GETDATE()) AS DATE)
                THEN 'Due Soon'
           ELSE 'Upcoming'
         END AS TaskStatus
-      FROM AircraftAudits aa
-      JOIN Aircraft a ON aa.AircraftId = a.AircraftId
-      ${whereClause}
-      ORDER BY aa.NextAuditDate ASC
+      FROM scoped
+      WHERE rn = 1
+      ORDER BY NextAuditDate ASC
     `);
 
     const tasks = result.recordset;

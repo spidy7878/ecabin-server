@@ -24,29 +24,6 @@ const usersController = {
     }
     res.json(result.recordset[0]);
   },
-
-  // GET /api/users/inspectors — all User-role accounts with their assignment count
-  async getInspectors(req, res) {
-    const pool = await getPool();
-    const result = await pool.request().query(`
-      SELECT
-        ud.UserId,
-        ud.Username,
-        ud.FirstName + ' ' + ud.LastName AS FullName,
-        ud.Email,
-        ud.Role,
-        COUNT(ia.AircraftId) AS AssignedCount
-      FROM dbo.UsersDetail ud
-      LEFT JOIN dbo.InspectorAircraftAssignment ia
-        ON ia.UserId  = ud.UserId
-       AND ia.Delmark = 'N'
-      WHERE ud.Role = 'User'
-        AND (ud.Delmark != 'Y' OR ud.Delmark IS NULL)
-      GROUP BY ud.UserId, ud.Username, ud.FirstName, ud.LastName, ud.Email, ud.Role
-      ORDER BY ud.FirstName, ud.LastName
-    `);
-    res.json(result.recordset);
-  },
 };
 
 module.exports = usersController;
