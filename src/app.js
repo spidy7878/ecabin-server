@@ -112,6 +112,8 @@ app.use(
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
+    // Uploads have their own higher-limit bucket above — don't double-count them.
+    skip: (req) => req.path.startsWith('/inspections/upload'),
     message: { error: { message: 'Too many requests, please try again later.' } },
   })
 );
